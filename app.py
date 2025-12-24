@@ -5,7 +5,11 @@ import os
 import requests
 
 # -------------------- Page Config --------------------
-st.set_page_config(page_title="WriteWise", layout="centered")
+st.set_page_config(
+    page_title="WriteWise",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
 
 st.title("WriteWise")
 st.caption("Thoughtful writing for startups — clear, original, and ready to publish.")
@@ -39,12 +43,14 @@ tone = st.selectbox(
     ["Clear & professional", "Conversational", "Persuasive"]
 )
 
+st.divider()
+
 # -------------------- Groq API Call --------------------
 def call_groq(prompt: str) -> str:
     api_key = st.secrets.get("GROQ_API_KEY")
 
     if not api_key:
-        st.error("Missing API configuration. Please try again later.")
+        st.error("❌ API configuration missing. Please try again later.")
         st.stop()
 
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -62,8 +68,8 @@ def call_groq(prompt: str) -> str:
                 "content": (
                     "You write like a thoughtful human editor. "
                     "Your tone is natural, concise, and clear. "
-                    "You avoid generic AI phrases, buzzwords, and filler. "
-                    "You write for real startup founders and teams."
+                    "Avoid generic AI phrases, buzzwords, and filler. "
+                    "Write for real startup founders and teams."
                 )
             },
             {"role": "user", "content": prompt}
@@ -75,18 +81,18 @@ def call_groq(prompt: str) -> str:
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=30)
     except requests.exceptions.RequestException:
-        st.error("Network issue while preparing the draft. Please try again.")
+        st.error("❌ Network issue while preparing the draft. Please try again.")
         st.stop()
 
     if response.status_code != 200:
-        st.error("Something went wrong while preparing your draft.")
+        st.error("❌ Something went wrong while preparing your draft.")
         st.code(response.text)
         st.stop()
 
     data = response.json()
 
     if "choices" not in data or not data["choices"]:
-        st.error("Unexpected response. Please try again.")
+        st.error("❌ Unexpected response. Please try again.")
         st.stop()
 
     return data["choices"][0]["message"]["content"]
@@ -100,7 +106,7 @@ if st.button("Create draft"):
             prompt = f"""
             Suggest 8–10 thoughtful blog ideas for a startup audience.
 
-            Topic focus:
+            Topic:
             {topic}
 
             Optional keywords:
@@ -126,8 +132,8 @@ if st.button("Create draft"):
             Writing style:
             {tone}
 
-            The writing should feel human, grounded, and easy to follow.
             Include an introduction, section headings, and a short conclusion.
+            The tone should feel human and grounded.
             """
 
         else:  # Refine existing content
@@ -135,7 +141,7 @@ if st.button("Create draft"):
             Edit and refine the following draft.
 
             Improve clarity, flow, and tone without sounding artificial.
-            Keep the voice human and direct.
+            Keep the voice human, direct, and confident.
 
             Draft:
             {topic}
@@ -155,7 +161,7 @@ if st.button("Create draft"):
         st.text_area(
             "Your draft",
             output,
-            height=400
+            height=280  # mobile-friendly height
         )
 
         # -------------------- Save Files --------------------
