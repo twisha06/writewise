@@ -11,16 +11,56 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# -------------------- Custom Styling --------------------
+st.markdown(
+    """
+    <style>
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 3rem;
+            max-width: 760px;
+        }
+        h1 {
+            margin-bottom: 0.2rem;
+        }
+        .subtitle {
+            color: #6b7280;
+            font-size: 0.95rem;
+            margin-bottom: 1.2rem;
+        }
+        .section-label {
+            font-weight: 600;
+            margin-top: 1.5rem;
+            margin-bottom: 0.3rem;
+        }
+        .helper-text {
+            font-size: 0.85rem;
+            color: #6b7280;
+            margin-bottom: 0.4rem;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# -------------------- Header --------------------
 st.title("WriteWise")
-st.caption("Thoughtful writing for startups — clear, original, and ready to publish.")
-st.markdown("> WriteWise helps you think through ideas, not just fill pages.")
+st.markdown(
+    '<div class="subtitle">Thoughtful writing for startups — clear, original, and ready to publish.</div>',
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    "> WriteWise helps you think through ideas, not just fill pages."
+)
 
 # -------------------- Setup --------------------
 os.makedirs("outputs", exist_ok=True)
 
-# -------------------- UI --------------------
+# -------------------- Input Section --------------------
+st.markdown('<div class="section-label">What would you like to work on?</div>', unsafe_allow_html=True)
 mode = st.selectbox(
-    "What would you like to work on today?",
+    "",
     [
         "Brainstorm blog ideas",
         "Write a complete blog",
@@ -28,18 +68,30 @@ mode = st.selectbox(
     ]
 )
 
+st.markdown('<div class="section-label">Your topic or draft</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="helper-text">Start with a rough idea, headline, or unfinished paragraph.</div>',
+    unsafe_allow_html=True
+)
 topic = st.text_area(
-    "Your topic or draft",
-    placeholder="e.g. How early-stage startups can use AI without overengineering"
+    "",
+    placeholder="e.g. How early-stage startups can use AI without overengineering",
+    height=140
 )
 
+st.markdown('<div class="section-label">Optional keywords</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="helper-text">Only add these if you care about search visibility.</div>',
+    unsafe_allow_html=True
+)
 keywords = st.text_input(
-    "Optional keywords",
+    "",
     placeholder="startup growth, AI tools, productivity"
 )
 
+st.markdown('<div class="section-label">Writing style</div>', unsafe_allow_html=True)
 tone = st.selectbox(
-    "Writing style",
+    "",
     ["Clear & professional", "Conversational", "Persuasive"]
 )
 
@@ -50,7 +102,7 @@ def call_groq(prompt: str) -> str:
     api_key = st.secrets.get("GROQ_API_KEY")
 
     if not api_key:
-        st.error("❌ API configuration missing. Please try again later.")
+        st.error("API configuration missing. Please try again later.")
         st.stop()
 
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -78,29 +130,21 @@ def call_groq(prompt: str) -> str:
         "max_tokens": 600
     }
 
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-    except requests.exceptions.RequestException:
-        st.error("❌ Network issue while preparing the draft. Please try again.")
-        st.stop()
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
 
     if response.status_code != 200:
-        st.error("❌ Something went wrong while preparing your draft.")
+        st.error("Something went wrong while preparing your draft.")
         st.code(response.text)
         st.stop()
 
-    data = response.json()
+    return response.json()["choices"][0]["message"]["content"]
 
-    if "choices" not in data or not data["choices"]:
-        st.error("❌ Unexpected response. Please try again.")
-        st.stop()
+# -------------------- Action --------------------
+st.markdown('<div class="section-label">Ready?</div>', unsafe_allow_html=True)
 
-    return data["choices"][0]["message"]["content"]
-
-# -------------------- Generate Button --------------------
 if st.button("Create draft"):
     if not topic:
-        st.warning("Start by adding a topic or a rough draft.")
+        st.warning("Add a topic or draft to continue.")
     else:
         if mode == "Brainstorm blog ideas":
             prompt = f"""
@@ -136,7 +180,7 @@ if st.button("Create draft"):
             The tone should feel human and grounded.
             """
 
-        else:  # Refine existing content
+        else:
             prompt = f"""
             Edit and refine the following draft.
 
@@ -156,12 +200,12 @@ if st.button("Create draft"):
         with st.spinner("Putting together a thoughtful draft…"):
             output = call_groq(prompt)
 
-        st.success("Draft ready. Feel free to tweak or download.")
+        st.success("Draft ready.")
 
         st.text_area(
             "Your draft",
             output,
-            height=280  # mobile-friendly height
+            height=280
         )
 
         # -------------------- Save Files --------------------
@@ -178,17 +222,7 @@ if st.button("Create draft"):
             doc.add_paragraph(line)
         doc.save(docx_path)
 
-        # -------------------- Downloads --------------------
-        st.download_button(
-            "Download as text",
-            output,
-            file_name=f"draft_{timestamp}.txt"
-        )
-
+        st.download_button("Download as text", output, file_name=f"draft_{timestamp}.txt")
         with open(docx_path, "rb") as f:
-            st.download_button(
-                "Download as Word file",
-                f,
-                file_name=f"draft_{timestamp}.docx"
-            )
+            st.download_button("Download as Word file", f, file_name=f"draft_{timestamp}.docx")
 
