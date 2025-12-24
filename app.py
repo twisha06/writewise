@@ -4,16 +4,16 @@ from docx import Document
 import os
 import requests
 
-# Page config
+# -------------------- Page Config --------------------
 st.set_page_config(page_title="WriteWise AI", layout="centered")
 
 st.title("📝 WriteWise – Startup Blog Generator")
 st.write("Generate SEO blogs, ideas, and rewrites using AI")
 
-# Ensure outputs folder exists
+# -------------------- Setup --------------------
 os.makedirs("outputs", exist_ok=True)
 
-# UI
+# -------------------- UI --------------------
 mode = st.selectbox(
     "Choose content type",
     ["Blog Ideas", "Full SEO Blog", "Rewrite Content"]
@@ -23,10 +23,18 @@ topic = st.text_area("Enter topic or content")
 keywords = st.text_input("SEO Keywords (comma separated)")
 tone = st.selectbox("Select tone", ["Professional", "Casual", "Persuasive"])
 
+# -------------------- Groq API Call --------------------
 def call_groq(prompt: str) -> str:
+    api_key = st.secrets.get("GROQ_API_KEY")
+
+    if not api_key:
+        st.error("❌ GROQ_API_KEY is missing in Streamlit Secrets.")
+        st.stop()
+
     url = "https://api.groq.com/openai/v1/chat/completions"
+
     headers = {
-        "Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
 
@@ -37,16 +45,34 @@ def call_groq(prompt: str) -> str:
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.5,
-        "max_tokens": 700
+        "max_tokens": 600
     }
 
-    response = requests.post(url, headers=headers, json=payload, timeout=30)
-    response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"]
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+    except requests.exceptions.RequestException as e:
+        st.error("❌ Network error while calling Groq API")
+        st.code(str(e))
+        st.stop()
 
+    if response.status_code != 200:
+        st.error(f"❌ Groq API Error {response.status_code}")
+        st.code(response.text)
+        st.stop()
+
+    data = response.json()
+
+    if "choices" not in data or not data["choices"]:
+        st.error("❌ Invalid response from Groq API")
+        st.code(data)
+        st.stop()
+
+    return data["choices"][0]["message"]["content"]
+
+# -------------------- Generate Button --------------------
 if st.button("Generate Content"):
     if not topic:
-        st.warning("Please enter topic or content")
+        st.warning("Please enter topic or content.")
     else:
         if mode == "Blog Ideas":
             prompt = f"""
@@ -65,12 +91,16 @@ if st.button("Generate Content"):
             SEO Keywords: {keywords}
             Tone: {tone}
 
-            Include introduction, headings, and conclusion.
+            Include:
+            - Introduction
+            - Headings
+            - Conclusion
             """
 
-        else:
+        else:  # Rewrite
             prompt = f"""
-            Rewrite the following content to be SEO-optimized and engaging.
+            Rewrite the following content to be SEO-optimized and engaging
+            for startup audiences.
 
             Content:
             {topic}
@@ -82,9 +112,10 @@ if st.button("Generate Content"):
         with st.spinner("Generating content..."):
             output = call_groq(prompt)
 
-        st.success("Content generated!")
+        st.success("✅ Content generated!")
         st.text_area("Generated Content", output, height=400)
 
+        # -------------------- Save Files --------------------
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         txt_path = f"outputs/content_{timestamp}.txt"
         docx_path = f"outputs/content_{timestamp}.docx"
@@ -98,8 +129,17 @@ if st.button("Generate Content"):
             doc.add_paragraph(line)
         doc.save(docx_path)
 
-        st.download_button("Download TXT", output, file_name=f"content_{timestamp}.txt")
+        # -------------------- Downloads --------------------
+        st.download_button(
+            "Download TXT",
+            output,
+            file_name=f"content_{timestamp}.txt"
+        )
 
         with open(docx_path, "rb") as f:
-            st.download_button("Download DOCX", f, file_name=f"content_{timestamp}.docx")
+            st.download_button(
+                "Download DOCX",
+                f,
+                file_name=f"content_{timestamp}.docx"
+            )
 
