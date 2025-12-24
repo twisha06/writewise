@@ -1,14 +1,17 @@
 import streamlit as st
-import subprocess
 from datetime import datetime
 from docx import Document
 import os
+from groq import Groq
 
 # Page config
-st.set_page_config(page_title="Startup Blog Bot", layout="centered")
+st.set_page_config(page_title="WriteWise AI", layout="centered")
 
-st.title("📝 Startup Blog Content Generator")
+st.title("📝 WriteWise – Startup Blog Generator")
 st.write("Generate SEO blogs, ideas, and rewrites using AI")
+
+# Groq client (API key from Streamlit Secrets)
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
 # Ensure outputs folder exists
 if not os.path.exists("outputs"):
@@ -29,7 +32,7 @@ if st.button("Generate Content"):
     if not topic:
         st.warning("Please enter topic or content")
     else:
-        # Build prompt
+        # Prompt building
         if mode == "Blog Ideas":
             prompt = f"""
             Generate 10 high-quality blog ideas for startups.
@@ -54,7 +57,7 @@ if st.button("Generate Content"):
             - Natural keyword usage
             """
 
-        else:  # Rewrite Content
+        else:
             prompt = f"""
             Rewrite the following content to be SEO-optimized and engaging
             for startup audiences.
@@ -66,36 +69,35 @@ if st.button("Generate Content"):
             Tone: {tone}
             """
 
-        # Run Ollama
         with st.spinner("Generating content..."):
-            result = subprocess.run(
-                ["ollama", "run", "llama3:8b", prompt],
-                capture_output=True,
-                text=True
+            response = client.chat.completions.create(
+                model="llama3-8b-8192",
+                messages=[
+                    {"role": "system", "content": "You are a professional startup content writer."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
             )
 
-        output = result.stdout
+        output = response.choices[0].message.content
 
         st.success("Content generated!")
         st.text_area("Generated Content", output, height=400)
 
-        # File names
+        # Save files
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         txt_file = f"outputs/content_{timestamp}.txt"
         docx_file = f"outputs/content_{timestamp}.docx"
 
-        # Save TXT
         with open(txt_file, "w") as f:
             f.write(output)
 
-        # Save DOCX
         doc = Document()
         doc.add_heading("Generated Content", level=1)
         for line in output.split("\n"):
             doc.add_paragraph(line)
         doc.save(docx_file)
 
-        # Download buttons
         st.download_button(
             "Download TXT",
             output,
