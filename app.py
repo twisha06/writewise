@@ -11,7 +11,8 @@ st.title("📝 WriteWise – Startup Blog Generator")
 st.write("Generate SEO blogs, ideas, and rewrites using AI")
 
 # Groq client (API key from Streamlit Secrets)
-client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+client = Groq()
 
 # Ensure outputs folder exists
 if not os.path.exists("outputs"):
